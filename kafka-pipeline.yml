@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: BuildConfig
+metadata:
+  name: kafka-pipeline
+  labels:
+    name: kafka-pipeline
+spec:
+  runPolicy: Serial
+  source:
+    type: None
+  strategy:
+    type: JenkinsPipeline
+    jenkinsPipelineStrategy:
+      jenkinsfile: |-
+        node("maven") {
+
+          stage("Configuration") {
+            // maven cache configuration (change mirror host)
+            sh "sed -i \"s|<!-- ### configured mirrors ### -->|<mirror><id>mirror.default</id><url>http://172.17.0.1:8765/nexus/content/groups/public/</url><mirrorOf>external:*</mirrorOf></mirror>|\" /home/jenkins/.m2/settings.xml"
+          }
+
+          stage("Checkout") {
+            git url: "https://github.com/nicolaferraro/voxxed-bigdata-kafka.git", branch: "master"
+          }
+
+          stage("Deploy to Development") {
+            sh "mvn clean fabric8:deploy -DskipTests -Dfabric8.namespace=development"
+          }
+
+          stage("Deploy to Production") {
+            input message: "Deploy to Production?"
+            sh "mvn clean fabric8:deploy -DskipTests -Dfabric8.namespace=production"
+          }
+
+        }
+
